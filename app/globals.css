@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  background: #000;
+  color: #fff;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  cursor: url("/images/cursor.webp"), auto;
+}
+
+::selection {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+a, button {
+  cursor: url("/images/cursor.webp"), auto;
+}
