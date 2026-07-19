@@ -53,19 +53,27 @@ interface LanyardData {
   activities: Array<{ name: string; type: number; details?: string; state?: string }>;
 }
 
-interface LastFMData {
-  track: {
-    name: string;
-    artist: { "#text": string };
-    album: { "#text": string; image: Array<{ size: string; "#text": string }> };
-  };
+interface LastFMTrack {
+  name: string;
+  artist: string;
+  album: string;
+  image: string | null;
+  nowPlaying: boolean;
+  playedAt: string | null;
+}
+
+interface Activity {
+  type: "roblox" | "crunchyroll" | "spotify" | "game";
+  name: string;
+  details?: string;
+  state?: string;
+  image?: string;
+  timestamp?: { start: number; end: number };
 }
 
 const BIRTH = new Date("2011-05-10T00:00:00-03:00");
 const DISCORD_ID = "1511630619153666181";
 const MS_YR = 1000 * 60 * 60 * 24 * 365.25;
-const LASTFM_USER = "obeskrov";
-const LASTFM_API_KEY = "YOUR_LASTFM_API_KEY";
 
 const S_COLOR: Record<string, string> = {
   online: "#23a55a",
@@ -233,8 +241,7 @@ function AgeTooltip({ age }: { age: string }) {
   return (
     <span
       style={{
-        display: "inline-flex",
-        alignItems: "baseline",
+        display: "inline-block",
         position: "relative",
         cursor: "none",
       }}
@@ -252,6 +259,7 @@ function AgeTooltip({ age }: { age: string }) {
           color: "#e6e6e6",
           fontSize: "0.9375rem",
           fontWeight: 500,
+          lineHeight: 1.4,
         }}
       >
         15 anos
@@ -261,7 +269,7 @@ function AgeTooltip({ age }: { age: string }) {
         style={{
           position: "fixed",
           left: position.x,
-          top: position.y - 34,
+          top: position.y - 32,
           transform: "translateX(-50%)",
           fontFamily: "var(--font-geist-mono), monospace",
           fontSize: "0.6rem",
@@ -356,7 +364,8 @@ export default function Page() {
   const [age, setAge] = useState("");
   const [now, setNow] = useState(Date.now());
   const [mounted, setMounted] = useState(false);
-  const [lastFM, setLastFM] = useState<LastFMData | null>(null);
+  const [lastFMTrack, setLastFMTrack] = useState<LastFMTrack | null>(null);
+  const [activities, setActivities] = useState<Activity[]>([]);
 
   const wsRef = useRef<WebSocket | null>(null);
   const navRef = useRef<HTMLDivElement>(null);
@@ -433,6 +442,38 @@ export default function Page() {
 
           if (op === 0 && d) {
             setLanyard(d);
+
+            const acts: Activity[] = [];
+            if (d.activities) {
+              d.activities.forEach((act: any) => {
+                const name = act.name?.toLowerCase() || "";
+                if (name.includes("roblox")) {
+                  acts.push({
+                    type: "roblox",
+                    name: "roblox",
+                    details: act.details,
+                    state: act.state,
+                    image: "https://www.roblox.com/favicon.ico",
+                  });
+                } else if (name.includes("crunchyroll") || name.includes("anime")) {
+                  acts.push({
+                    type: "crunchyroll",
+                    name: "crunchyroll",
+                    details: act.details,
+                    state: act.state,
+                    image: "https://www.crunchyroll.com/favicon.ico",
+                  });
+                } else if (act.type === 0) {
+                  acts.push({
+                    type: "game",
+                    name: act.name || "",
+                    details: act.details,
+                    state: act.state,
+                  });
+                }
+              });
+            }
+            setActivities(acts);
           }
         } catch (err) {}
       };
@@ -460,15 +501,17 @@ export default function Page() {
   useEffect(() => {
     const fetchLastFM = async () => {
       try {
-        const res = await fetch(
-          `https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${LASTFM_USER}&api_key=${LASTFM_API_KEY}&format=json&limit=1`
-        );
+        const res = await fetch("/api/lastfm");
         const data = await res.json();
-        if (data.recenttracks?.track?.[0]) {
-          setLastFM(data.recenttracks.track[0]);
+
+        if (data.track) {
+          setLastFMTrack(data.track);
+        } else {
+          setLastFMTrack(null);
         }
       } catch (error) {
         console.error("Failed to fetch Last.fm data:", error);
+        setLastFMTrack(null);
       }
     };
 
@@ -503,6 +546,7 @@ export default function Page() {
     const container = document.querySelector(`[data-tab="${currentTab}"]`);
     if (!container) return;
 
+    // animate container
     gsap.fromTo(
       container,
       { opacity: 0, y: 10 },
@@ -514,6 +558,24 @@ export default function Page() {
         clearProps: "opacity,y",
       }
     );
+
+    // also animate data-in children so separators and labels always appear
+    const children = container.querySelectorAll("[data-in]");
+    if (children.length > 0) {
+      gsap.fromTo(
+        Array.from(children),
+        { opacity: 0, y: 12 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.6,
+          stagger: 0.05,
+          ease: "power3.out",
+          clearProps: "opacity,y",
+          delay: 0.05,
+        }
+      );
+    }
   }, [currentTab, mounted]);
 
   if (!mounted) return null;
@@ -533,10 +595,11 @@ export default function Page() {
     ? Math.min(1, (now - spotify.timestamps.start) / (spotify.timestamps.end - spotify.timestamps.start))
     : 0;
 
-  const albumArt = lastFM?.track?.album?.image?.find(img => img.size === "large")?.["#text"] || null;
-  const trackName = lastFM?.track?.name || "";
-  const artistName = lastFM?.track?.artist?.["#text"] || "";
-  const albumName = lastFM?.track?.album?.["#text"] || "";
+  const albumArt = lastFMTrack?.image ? `/api/image-proxy?url=${encodeURIComponent(lastFMTrack.image)}` : null;
+  const trackName = lastFMTrack?.name || "";
+  const artistName = lastFMTrack?.artist || "";
+  const albumName = lastFMTrack?.album || "";
+  const nowPlaying = lastFMTrack?.nowPlaying || false;
 
   const Mono = ({ children, style = {} }: { children: React.ReactNode; style?: React.CSSProperties }) => (
     <span style={{ fontFamily: "var(--font-geist-mono), monospace", ...style }}>{children}</span>
@@ -567,66 +630,113 @@ export default function Page() {
 
   const renderHome = () => (
     <div data-tab="home" style={{ display: "flex", flexDirection: "column" }}>
-      <div data-in>{labelLine("iae")}</div>
-
-      <div data-in style={{ marginBottom: "16px" }}>
-        <h1
-          style={{
-            fontFamily: "var(--font-geist), sans-serif",
-            fontSize: "clamp(1.6rem, 3.5vw, 2.2rem)",
-            fontWeight: 700,
-            letterSpacing: "-0.04em",
-            lineHeight: 1,
-            color: "#e6e6e6",
-            marginBottom: "10px",
-            textTransform: "lowercase" as const,
-          }}
-        >
-          obeskrov
-        </h1>
-
-        <a
-          href={`https://discord.com/users/${DISCORD_ID}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "6px",
-            textDecoration: "none",
-          }}
-        >
-          {avatarSmall && (
-            <img
-              src={avatarSmall}
-              alt=""
-              width={18}
-              height={18}
-              style={{
-                borderRadius: "50%",
-                border: "1px solid rgba(255,255,255,0.08)",
-                flexShrink: 0,
-              }}
-            />
-          )}
-          <span
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: "16px",
+        }}
+      >
+        <div data-in>
+          {labelLine("iae")}
+          <h1
             style={{
-              fontFamily: "var(--font-geist-mono), monospace",
-              fontSize: "0.75rem",
-              color: "#4a4a4a",
-              letterSpacing: "-0.01em",
-              transition: "color 0.2s",
-              cursor: "none",
-              display: "inline-block",
-              padding: "2px 0",
+              fontFamily: "var(--font-geist), sans-serif",
+              fontSize: "clamp(1.6rem, 3.5vw, 2.2rem)",
+              fontWeight: 700,
+              letterSpacing: "-0.04em",
+              lineHeight: 1,
+              color: "#e6e6e6",
+              marginTop: "4px",
               textTransform: "lowercase" as const,
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "#e6e6e6")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "#4a4a4a")}
           >
-            @{lanyard?.discord_user?.username ?? "obeskrov"}
-          </span>
-        </a>
+            obeskrov
+          </h1>
+          <a
+            href={`https://discord.com/users/${DISCORD_ID}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              textDecoration: "none",
+              marginTop: "8px",
+            }}
+          >
+            {avatarSmall && (
+              <img
+                src={avatarSmall}
+                alt=""
+                width={18}
+                height={18}
+                style={{
+                  borderRadius: "50%",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  flexShrink: 0,
+                }}
+              />
+            )}
+            <span
+              style={{
+                fontFamily: "var(--font-geist-mono), monospace",
+                fontSize: "0.75rem",
+                color: "#4a4a4a",
+                letterSpacing: "-0.01em",
+                transition: "color 0.2s",
+                cursor: "none",
+                display: "inline-block",
+                padding: "2px 0",
+                textTransform: "lowercase" as const,
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#e6e6e6")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#4a4a4a")}
+            >
+              @{lanyard?.discord_user?.username ?? "obeskrov"}
+            </span>
+          </a>
+        </div>
+
+        {lastFMTrack && trackName && (
+          <div
+            data-in
+            style={{
+              textAlign: "right",
+              maxWidth: "200px",
+              marginTop: "28px",
+            }}
+          >
+            <p
+              style={{
+                fontFamily: "var(--font-geist-mono), monospace",
+                fontSize: "0.5rem",
+                color: "#4a4a4a",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase" as const,
+              }}
+            >
+              ouvindo agora
+            </p>
+            <p
+              style={{
+                fontFamily: "var(--font-geist), sans-serif",
+                fontSize: "0.8rem",
+                color: "#e6e6e6",
+                fontWeight: 500,
+                marginTop: "2px",
+                lineHeight: 1.2,
+                background: "linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(200,200,200,0.6) 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}
+            >
+              {artistName} · {trackName}
+            </p>
+          </div>
+        )}
       </div>
 
       <p
@@ -637,7 +747,7 @@ export default function Page() {
           color: "#4a4a4a",
           lineHeight: 1.8,
           maxWidth: "520px",
-          marginBottom: spotify ? "20px" : "0",
+          marginBottom: "24px",
         }}
       >
         Sou um desenvolvedor front-end e designer de interfaces brasileiro. Tenho{" "}
@@ -655,8 +765,72 @@ export default function Page() {
         do que eram quando nasceram.
       </p>
 
+      {activities.length > 0 && (
+        <div
+          data-in
+          style={{
+            display: "flex",
+            gap: "10px",
+            flexWrap: "wrap",
+            marginBottom: "16px",
+          }}
+        >
+          {activities.map((act, i) => (
+            <div
+              key={i}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "8px 14px",
+                borderRadius: "10px",
+                background: "rgba(255,255,255,0.03)",
+                backdropFilter: "blur(12px)",
+                WebkitBackdropFilter: "blur(12px)",
+                border: "1px solid rgba(255,255,255,0.05)",
+                boxShadow: "0 4px 20px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.04)",
+              }}
+            >
+              {act.image && (
+                <img
+                  src={act.image}
+                  alt={act.type}
+                  width={20}
+                  height={20}
+                  style={{ borderRadius: "4px", flexShrink: 0 }}
+                />
+              )}
+              <div>
+                <p
+                  style={{
+                    fontFamily: "var(--font-geist-mono), monospace",
+                    fontSize: "0.5rem",
+                    color: "#4a4a4a",
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase" as const,
+                  }}
+                >
+                  {act.type}
+                </p>
+                <p
+                  style={{
+                    fontFamily: "var(--font-geist), sans-serif",
+                    fontSize: "0.7rem",
+                    color: "#e6e6e6",
+                    fontWeight: 400,
+                  }}
+                >
+                  {act.details || act.name}
+                  {act.state && ` · ${act.state}`}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {spotify && (
-        <div data-in style={{ marginTop: "4px" }}>
+        <div data-in>
           <a
             href={`https://open.spotify.com/track/${spotify.track_id}`}
             target="_blank"
@@ -776,7 +950,7 @@ export default function Page() {
 
     return (
       <div data-tab="skills" style={{ display: "flex", flexDirection: "column" }}>
-        <div data-in style={{ marginBottom: "40px" }}>
+        <div data-in>
           {labelLine("meu stack")}
           <h1
             style={{
@@ -884,7 +1058,7 @@ export default function Page() {
 
     return (
       <div data-tab="contact" style={{ display: "flex", flexDirection: "column" }}>
-        <div data-in style={{ marginBottom: "40px" }}>
+        <div data-in>
           {labelLine("fala comigo")}
           <h1
             style={{
@@ -915,7 +1089,7 @@ export default function Page() {
         </div>
 
         {lanyard?.discord_user && (
-          <div data-in style={{ marginBottom: "36px" }}>
+          <div data-in>
             <div className="discord-card">
               {avatarUrl && (
                 <img src={avatarUrl} alt="avatar" className="discord-avatar" />
@@ -949,7 +1123,7 @@ export default function Page() {
           </div>
         )}
 
-        <div data-in style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+        <div data-in style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "28px" }}>
           {socials.map((social) => (
             <a
               key={social.id}
@@ -1008,19 +1182,34 @@ export default function Page() {
   return (
     <>
       {albumBg && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: -1,
-            backgroundImage: `url(${albumBg})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            filter: "blur(60px) brightness(0.4) saturate(0.6)",
-            opacity: 0.5,
-            transform: "scale(1.1)",
-          }}
-        />
+        <>
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: -1,
+              backgroundImage: `url(${albumBg})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              filter: "blur(80px) brightness(0.35) saturate(0.5)",
+              opacity: 0.6,
+              transform: "scale(1.2)",
+            }}
+          />
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: -1,
+              backgroundImage: `url(${albumBg})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              filter: "blur(120px) brightness(0.25) saturate(0.4)",
+              opacity: 0.3,
+              transform: "scale(1.4)",
+            }}
+          />
+        </>
       )}
 
       <div
@@ -1029,11 +1218,21 @@ export default function Page() {
           inset: 0,
           zIndex: -1,
           backgroundImage: `
-            linear-gradient(rgba(8,8,8,0.85) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(8,8,8,0.85) 1px, transparent 1px)
+            linear-gradient(rgba(8,8,8,0.7) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(8,8,8,0.7) 1px, transparent 1px)
           `,
-          backgroundSize: "40px 40px",
+          backgroundSize: "32px 32px",
           backgroundPosition: "center center",
+          pointerEvents: "none",
+        }}
+      />
+
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: -1,
+          background: "radial-gradient(ellipse at center, rgba(8,8,8,0.3) 0%, rgba(8,8,8,0.7) 100%)",
           pointerEvents: "none",
         }}
       />
@@ -1067,69 +1266,7 @@ export default function Page() {
           fontFamily: "var(--font-geist), sans-serif",
         }}
       >
-        <div style={{ width: "100%", maxWidth: "620px" }}>
-          {lastFM && trackName && (
-            <div
-              data-in
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "12px",
-                marginBottom: "32px",
-                opacity: 0,
-                paddingLeft: "4px",
-              }}
-            >
-              {albumArt && (
-                <img
-                  src={albumArt}
-                  alt={albumName}
-                  width={40}
-                  height={40}
-                  style={{
-                    borderRadius: "4px",
-                    flexShrink: 0,
-                    boxShadow: "0 2px 12px rgba(0,0,0,0.4)",
-                  }}
-                />
-              )}
-              <div style={{ minWidth: 0 }}>
-                <p
-                  style={{
-                    fontFamily: "var(--font-geist-mono), monospace",
-                    fontSize: "0.6rem",
-                    color: "#4a4a4a",
-                    letterSpacing: "0.04em",
-                    textTransform: "uppercase" as const,
-                  }}
-                >
-                  currently listening
-                </p>
-                <p
-                  style={{
-                    fontFamily: "var(--font-geist), sans-serif",
-                    fontSize: "0.85rem",
-                    color: "#e6e6e6",
-                    fontWeight: 500,
-                    marginTop: "2px",
-                  }}
-                >
-                  {trackName}
-                </p>
-                <p
-                  style={{
-                    fontFamily: "var(--font-geist-mono), monospace",
-                    fontSize: "0.65rem",
-                    color: "#4a4a4a",
-                    marginTop: "1px",
-                  }}
-                >
-                  {artistName} · {albumName}
-                </p>
-              </div>
-            </div>
-          )}
-
+        <div style={{ width: "100%", maxWidth: "720px" }}>
           {tabContent[currentTab]}
         </div>
       </div>
