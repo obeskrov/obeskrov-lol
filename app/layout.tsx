@@ -2,40 +2,45 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 
-const switzer = localFont({
+const geist = localFont({
   src: [
-    { path: "../public/fonts/Switzer-Regular.otf", weight: "400", style: "normal" },
-    { path: "../public/fonts/Switzer-Medium.otf", weight: "500", style: "normal" },
-    { path: "../public/fonts/Switzer-Bold.otf", weight: "700", style: "normal" },
+    { path: "../public/fonts/Geist-Regular.otf", weight: "400", style: "normal" },
+    { path: "../public/fonts/Geist-Medium.otf", weight: "500", style: "normal" },
+    { path: "../public/fonts/Geist-Bold.otf", weight: "700", style: "normal" },
   ],
-  variable: "--font-switzer",
+  variable: "--font-geist",
+  display: "swap",
 });
 
-const gallant = localFont({
-  src: "../public/fonts/Gallant-Regular.woff2",
-  variable: "--font-gallant",
-  weight: "400",
+const geistMono = localFont({
+  src: [
+    { path: "../public/fonts/GeistMono-Regular.otf", weight: "400", style: "normal" },
+    { path: "../public/fonts/GeistMono-Medium.otf", weight: "500", style: "normal" },
+  ],
+  variable: "--font-geist-mono",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://obeskrov.lol"),
   title: "obeskrov",
-  description: "frontend developer & ui designer",
+  description: "desenvolvedor front-end e designer de interfaces",
   icons: { icon: "/images/favicon.webp" },
   openGraph: {
     title: "obeskrov",
-    description: "frontend developer & ui designer",
+    description: "desenvolvedor front-end e designer de interfaces",
     url: "https://obeskrov.lol",
     siteName: "obeskrov",
-    images: ["/images/miniaylan.jpeg"],
     type: "website",
   },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className={`${switzer.variable} ${gallant.variable}`}>
+    <html lang="pt-BR" suppressHydrationWarning>
+      <body className={`${geist.variable} ${geistMono.variable}`}>
+        <canvas id="particles" aria-hidden="true" />
+        <div id="cursor" aria-hidden="true" />
         {children}
       </body>
     </html>
