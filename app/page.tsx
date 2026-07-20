@@ -546,7 +546,6 @@ export default function Page() {
     const container = document.querySelector(`[data-tab="${currentTab}"]`);
     if (!container) return;
 
-    // animate container
     gsap.fromTo(
       container,
       { opacity: 0, y: 10 },
@@ -559,7 +558,6 @@ export default function Page() {
       }
     );
 
-    // also animate data-in children so separators and labels always appear
     const children = container.querySelectorAll("[data-in]");
     if (children.length > 0) {
       gsap.fromTo(
@@ -699,7 +697,7 @@ export default function Page() {
           </a>
         </div>
 
-        {lastFMTrack && trackName && (
+        {nowPlaying && lastFMTrack && trackName && (
           <div
             data-in
             style={{
@@ -764,149 +762,6 @@ export default function Page() {
         obsessão até ficarem prontos; outros acabam se transformando em algo completamente diferente
         do que eram quando nasceram.
       </p>
-
-      {activities.length > 0 && (
-        <div
-          data-in
-          style={{
-            display: "flex",
-            gap: "10px",
-            flexWrap: "wrap",
-            marginBottom: "16px",
-          }}
-        >
-          {activities.map((act, i) => (
-            <div
-              key={i}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "8px 14px",
-                borderRadius: "10px",
-                background: "rgba(255,255,255,0.03)",
-                backdropFilter: "blur(12px)",
-                WebkitBackdropFilter: "blur(12px)",
-                border: "1px solid rgba(255,255,255,0.05)",
-                boxShadow: "0 4px 20px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.04)",
-              }}
-            >
-              {act.image && (
-                <img
-                  src={act.image}
-                  alt={act.type}
-                  width={20}
-                  height={20}
-                  style={{ borderRadius: "4px", flexShrink: 0 }}
-                />
-              )}
-              <div>
-                <p
-                  style={{
-                    fontFamily: "var(--font-geist-mono), monospace",
-                    fontSize: "0.5rem",
-                    color: "#4a4a4a",
-                    letterSpacing: "0.06em",
-                    textTransform: "uppercase" as const,
-                  }}
-                >
-                  {act.type}
-                </p>
-                <p
-                  style={{
-                    fontFamily: "var(--font-geist), sans-serif",
-                    fontSize: "0.7rem",
-                    color: "#e6e6e6",
-                    fontWeight: 400,
-                  }}
-                >
-                  {act.details || act.name}
-                  {act.state && ` · ${act.state}`}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {spotify && (
-        <div data-in>
-          <a
-            href={`https://open.spotify.com/track/${spotify.track_id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "12px",
-              textDecoration: "none",
-              padding: "8px 14px",
-              border: "1px solid rgba(255,255,255,0.07)",
-              borderRadius: "8px",
-              background: "rgba(255,255,255,0.02)",
-              transition: "border-color 0.2s, background 0.2s",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = "rgba(255,255,255,0.13)";
-              e.currentTarget.style.background = "rgba(255,255,255,0.04)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)";
-              e.currentTarget.style.background = "rgba(255,255,255,0.02)";
-            }}
-          >
-            <img
-              src={spotify.album_art_url}
-              alt=""
-              width={36}
-              height={36}
-              style={{ borderRadius: "4px", flexShrink: 0 }}
-            />
-            <div style={{ minWidth: 0 }}>
-              <p
-                style={{
-                  fontFamily: "var(--font-geist), sans-serif",
-                  fontSize: "0.8rem",
-                  fontWeight: 500,
-                  color: "#e6e6e6",
-                }}
-              >
-                {spotify.song}
-              </p>
-              <p
-                style={{
-                  fontFamily: "var(--font-geist-mono), monospace",
-                  fontSize: "0.62rem",
-                  color: "#4a4a4a",
-                }}
-              >
-                {spotify.artist}
-              </p>
-            </div>
-            <div style={{ flexShrink: 0, width: "50px" }}>
-              <div style={{ height: "2px", background: "rgba(255,255,255,0.07)", borderRadius: "2px" }}>
-                <div
-                  style={{
-                    height: "100%",
-                    width: `${spotifyProg * 100}%`,
-                    background: "rgba(255,255,255,0.3)",
-                    borderRadius: "2px",
-                    transition: "width 0.25s linear",
-                  }}
-                />
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "3px" }}>
-                <Mono style={{ fontSize: "0.45rem", color: "#4a4a4a" }}>
-                  {fmtMs(now - spotify.timestamps.start)}
-                </Mono>
-                <Mono style={{ fontSize: "0.45rem", color: "#4a4a4a" }}>
-                  {fmtMs(spotify.timestamps.end - spotify.timestamps.start)}
-                </Mono>
-              </div>
-            </div>
-          </a>
-        </div>
-      )}
     </div>
   );
 
@@ -1177,63 +1032,80 @@ export default function Page() {
     contact: renderContact(),
   };
 
-  const albumBg = albumArt || "";
+  const albumBg = (nowPlaying && albumArt) || "";
 
   return (
     <>
+      {/* Fundo padrão com partículas (sempre presente) */}
+      <canvas
+        id="particles"
+        aria-hidden="true"
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: "none",
+        }}
+      />
+
+      {/* Background dinâmico da capa do álbum - só aparece quando está tocando */}
       {albumBg && (
         <>
           <div
             style={{
               position: "fixed",
               inset: 0,
-              zIndex: -1,
+              zIndex: 0,
               backgroundImage: `url(${albumBg})`,
               backgroundSize: "cover",
               backgroundPosition: "center",
-              filter: "blur(80px) brightness(0.35) saturate(0.5)",
-              opacity: 0.6,
-              transform: "scale(1.2)",
+              filter: "blur(100px) brightness(0.4) saturate(0.5)",
+              opacity: 0.5,
+              transform: "scale(1.1)",
+              transition: "opacity 0.8s ease-in-out",
             }}
           />
           <div
             style={{
               position: "fixed",
               inset: 0,
-              zIndex: -1,
+              zIndex: 0,
               backgroundImage: `url(${albumBg})`,
               backgroundSize: "cover",
               backgroundPosition: "center",
-              filter: "blur(120px) brightness(0.25) saturate(0.4)",
-              opacity: 0.3,
-              transform: "scale(1.4)",
+              filter: "blur(160px) brightness(0.3) saturate(0.4)",
+              opacity: 0.25,
+              transform: "scale(1.3)",
+              transition: "opacity 0.8s ease-in-out",
+            }}
+          />
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 0,
+              background: "radial-gradient(ellipse at center, rgba(8,8,8,0.2) 0%, rgba(8,8,8,0.7) 100%)",
+              pointerEvents: "none",
+              transition: "opacity 0.8s ease-in-out",
             }}
           />
         </>
       )}
 
+      {/* Grid overlay - sempre presente, com opacidade reduzida quando tem música */}
       <div
         style={{
           position: "fixed",
           inset: 0,
-          zIndex: -1,
+          zIndex: 0,
           backgroundImage: `
-            linear-gradient(rgba(8,8,8,0.7) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(8,8,8,0.7) 1px, transparent 1px)
+            linear-gradient(rgba(8,8,8,${albumBg ? 0.4 : 0.7}) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(8,8,8,${albumBg ? 0.4 : 0.7}) 1px, transparent 1px)
           `,
           backgroundSize: "32px 32px",
           backgroundPosition: "center center",
           pointerEvents: "none",
-        }}
-      />
-
-      <div
-        style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: -1,
-          background: "radial-gradient(ellipse at center, rgba(8,8,8,0.3) 0%, rgba(8,8,8,0.7) 100%)",
-          pointerEvents: "none",
+          transition: "opacity 0.8s ease-in-out",
         }}
       />
 
