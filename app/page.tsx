@@ -108,15 +108,15 @@ function startParticles(canvas: HTMLCanvasElement) {
   resize();
   window.addEventListener("resize", resize, { passive: true });
 
-  for (let i = 0; i < 70; i++) {
+  for (let i = 0; i < 100; i++) {
     pts.push({
       x: Math.random() * window.innerWidth,
       y: Math.random() * window.innerHeight,
-      vx: (Math.random() - 0.5) * 0.1,
-      vy: (Math.random() - 0.5) * 0.1,
-      a: Math.random() * 0.15 + 0.02,
-      r: Math.random() * 0.8 + 0.15,
-      da: (Math.random() - 0.5) * 0.0003,
+      vx: (Math.random() - 0.5) * 0.12,
+      vy: (Math.random() - 0.5) * 0.12,
+      a: Math.random() * 0.25 + 0.08,
+      r: Math.random() * 0.8 + 0.2,
+      da: (Math.random() - 0.5) * 0.0004,
     });
   }
 
@@ -125,7 +125,7 @@ function startParticles(canvas: HTMLCanvasElement) {
     for (const p of pts) {
       p.x = (p.x + p.vx + canvas.width) % canvas.width;
       p.y = (p.y + p.vy + canvas.height) % canvas.height;
-      p.a = Math.max(0.02, Math.min(0.2, p.a + p.da));
+      p.a = Math.max(0.04, Math.min(0.35, p.a + p.da));
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
       ctx.fillStyle = `rgba(255,255,255,${p.a})`;
@@ -487,19 +487,19 @@ export default function Page() {
     if (shouldShow && !isAlbumVisible) {
       setIsAlbumVisible(true);
       if (bgRef.current) {
-        gsap.to(bgRef.current, { opacity: 0.5, duration: 0.8, ease: "power2.out" });
+        gsap.to(bgRef.current, { opacity: 0.55, duration: 0.9, ease: "power2.out" });
       }
       if (bgRef2.current) {
-        gsap.to(bgRef2.current, { opacity: 0.25, duration: 0.8, ease: "power2.out" });
+        gsap.to(bgRef2.current, { opacity: 0.3, duration: 0.9, ease: "power2.out" });
       }
     } else if (!shouldShow && isAlbumVisible) {
       if (bgRef.current) {
-        gsap.to(bgRef.current, { opacity: 0, duration: 0.8, ease: "power2.out" });
+        gsap.to(bgRef.current, { opacity: 0, duration: 0.9, ease: "power2.out" });
       }
       if (bgRef2.current) {
-        gsap.to(bgRef2.current, { opacity: 0, duration: 0.8, ease: "power2.out" });
+        gsap.to(bgRef2.current, { opacity: 0, duration: 0.9, ease: "power2.out" });
       }
-      setTimeout(() => setIsAlbumVisible(false), 800);
+      setTimeout(() => setIsAlbumVisible(false), 900);
     }
   }, [lastFMTrack, isAlbumVisible]);
 
@@ -1019,19 +1019,27 @@ export default function Page() {
 
   return (
     <>
-      {/* Partículas - sempre presente */}
-      <canvas
-        id="particles"
-        aria-hidden="true"
+      <div
         style={{
           position: "fixed",
           inset: 0,
           zIndex: 0,
           pointerEvents: "none",
         }}
-      />
+      >
+        <canvas
+          id="particles"
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            display: "block",
+          }}
+        />
+      </div>
 
-      {/* Background dinâmico da capa - aparece e desaparece com fade */}
       {albumBg && (
         <>
           <div
@@ -1043,10 +1051,10 @@ export default function Page() {
               backgroundImage: `url(${albumBg})`,
               backgroundSize: "cover",
               backgroundPosition: "center",
-              filter: "blur(50px) brightness(0.5) saturate(0.7)",
+              filter: "blur(40px) brightness(0.55) saturate(0.8)",
               opacity: 0,
-              transform: "scale(1.05)",
-              transition: "opacity 0.8s ease-in-out, filter 0.8s ease-in-out",
+              transform: "scale(1.02)",
+              transition: "opacity 0.9s ease-in-out, filter 0.9s ease-in-out",
             }}
           />
           <div
@@ -1058,10 +1066,10 @@ export default function Page() {
               backgroundImage: `url(${albumBg})`,
               backgroundSize: "cover",
               backgroundPosition: "center",
-              filter: "blur(100px) brightness(0.35) saturate(0.5)",
+              filter: "blur(80px) brightness(0.4) saturate(0.6)",
               opacity: 0,
-              transform: "scale(1.2)",
-              transition: "opacity 0.8s ease-in-out, filter 0.8s ease-in-out",
+              transform: "scale(1.15)",
+              transition: "opacity 0.9s ease-in-out, filter 0.9s ease-in-out",
             }}
           />
           <div
@@ -1069,14 +1077,13 @@ export default function Page() {
               position: "fixed",
               inset: 0,
               zIndex: 0,
-              background: "radial-gradient(ellipse at center, rgba(8,8,8,0.15) 0%, rgba(8,8,8,0.75) 100%)",
+              background: "radial-gradient(ellipse at center, rgba(8,8,8,0.1) 0%, rgba(8,8,8,0.8) 100%)",
               pointerEvents: "none",
             }}
           />
         </>
       )}
 
-      {/* Fundo preto base */}
       <div
         style={{
           position: "fixed",
