@@ -62,15 +62,6 @@ interface LastFMTrack {
   playedAt: string | null;
 }
 
-interface Activity {
-  type: "roblox" | "crunchyroll" | "spotify" | "game";
-  name: string;
-  details?: string;
-  state?: string;
-  image?: string;
-  timestamp?: { start: number; end: number };
-}
-
 const BIRTH = new Date("2011-05-10T00:00:00-03:00");
 const DISCORD_ID = "1511630619153666181";
 const MS_YR = 1000 * 60 * 60 * 24 * 365.25;
@@ -365,12 +356,14 @@ export default function Page() {
   const [now, setNow] = useState(Date.now());
   const [mounted, setMounted] = useState(false);
   const [lastFMTrack, setLastFMTrack] = useState<LastFMTrack | null>(null);
-  const [activities, setActivities] = useState<Activity[]>([]);
+  const [isAlbumVisible, setIsAlbumVisible] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const navRef = useRef<HTMLDivElement>(null);
   const indicatorRef = useRef<HTMLDivElement>(null);
   const isFirstRun = useRef(true);
+  const bgRef = useRef<HTMLDivElement>(null);
+  const bgRef2 = useRef<HTMLDivElement>(null);
 
   const updateIndicator = useCallback((rect: DOMRect) => {
     if (!indicatorRef.current || !navRef.current) return;
@@ -442,38 +435,6 @@ export default function Page() {
 
           if (op === 0 && d) {
             setLanyard(d);
-
-            const acts: Activity[] = [];
-            if (d.activities) {
-              d.activities.forEach((act: any) => {
-                const name = act.name?.toLowerCase() || "";
-                if (name.includes("roblox")) {
-                  acts.push({
-                    type: "roblox",
-                    name: "roblox",
-                    details: act.details,
-                    state: act.state,
-                    image: "https://www.roblox.com/favicon.ico",
-                  });
-                } else if (name.includes("crunchyroll") || name.includes("anime")) {
-                  acts.push({
-                    type: "crunchyroll",
-                    name: "crunchyroll",
-                    details: act.details,
-                    state: act.state,
-                    image: "https://www.crunchyroll.com/favicon.ico",
-                  });
-                } else if (act.type === 0) {
-                  acts.push({
-                    type: "game",
-                    name: act.name || "",
-                    details: act.details,
-                    state: act.state,
-                  });
-                }
-              });
-            }
-            setActivities(acts);
           }
         } catch (err) {}
       };
@@ -519,6 +480,28 @@ export default function Page() {
     const interval = setInterval(fetchLastFM, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const shouldShow = lastFMTrack?.nowPlaying === true && lastFMTrack?.image;
+    
+    if (shouldShow && !isAlbumVisible) {
+      setIsAlbumVisible(true);
+      if (bgRef.current) {
+        gsap.to(bgRef.current, { opacity: 0.5, duration: 0.8, ease: "power2.out" });
+      }
+      if (bgRef2.current) {
+        gsap.to(bgRef2.current, { opacity: 0.25, duration: 0.8, ease: "power2.out" });
+      }
+    } else if (!shouldShow && isAlbumVisible) {
+      if (bgRef.current) {
+        gsap.to(bgRef.current, { opacity: 0, duration: 0.8, ease: "power2.out" });
+      }
+      if (bgRef2.current) {
+        gsap.to(bgRef2.current, { opacity: 0, duration: 0.8, ease: "power2.out" });
+      }
+      setTimeout(() => setIsAlbumVisible(false), 800);
+    }
+  }, [lastFMTrack, isAlbumVisible]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -1036,7 +1019,7 @@ export default function Page() {
 
   return (
     <>
-      {/* Fundo padrão com partículas (sempre presente) */}
+      {/* Partículas - sempre presente */}
       <canvas
         id="particles"
         aria-hidden="true"
@@ -1048,10 +1031,11 @@ export default function Page() {
         }}
       />
 
-      {/* Background dinâmico da capa do álbum - só aparece quando está tocando */}
+      {/* Background dinâmico da capa - aparece e desaparece com fade */}
       {albumBg && (
         <>
           <div
+            ref={bgRef}
             style={{
               position: "fixed",
               inset: 0,
@@ -1059,13 +1043,14 @@ export default function Page() {
               backgroundImage: `url(${albumBg})`,
               backgroundSize: "cover",
               backgroundPosition: "center",
-              filter: "blur(100px) brightness(0.4) saturate(0.5)",
-              opacity: 0.5,
-              transform: "scale(1.1)",
-              transition: "opacity 0.8s ease-in-out",
+              filter: "blur(50px) brightness(0.5) saturate(0.7)",
+              opacity: 0,
+              transform: "scale(1.05)",
+              transition: "opacity 0.8s ease-in-out, filter 0.8s ease-in-out",
             }}
           />
           <div
+            ref={bgRef2}
             style={{
               position: "fixed",
               inset: 0,
@@ -1073,10 +1058,10 @@ export default function Page() {
               backgroundImage: `url(${albumBg})`,
               backgroundSize: "cover",
               backgroundPosition: "center",
-              filter: "blur(160px) brightness(0.3) saturate(0.4)",
-              opacity: 0.25,
-              transform: "scale(1.3)",
-              transition: "opacity 0.8s ease-in-out",
+              filter: "blur(100px) brightness(0.35) saturate(0.5)",
+              opacity: 0,
+              transform: "scale(1.2)",
+              transition: "opacity 0.8s ease-in-out, filter 0.8s ease-in-out",
             }}
           />
           <div
@@ -1084,28 +1069,20 @@ export default function Page() {
               position: "fixed",
               inset: 0,
               zIndex: 0,
-              background: "radial-gradient(ellipse at center, rgba(8,8,8,0.2) 0%, rgba(8,8,8,0.7) 100%)",
+              background: "radial-gradient(ellipse at center, rgba(8,8,8,0.15) 0%, rgba(8,8,8,0.75) 100%)",
               pointerEvents: "none",
-              transition: "opacity 0.8s ease-in-out",
             }}
           />
         </>
       )}
 
-      {/* Grid overlay - sempre presente, com opacidade reduzida quando tem música */}
+      {/* Fundo preto base */}
       <div
         style={{
           position: "fixed",
           inset: 0,
-          zIndex: 0,
-          backgroundImage: `
-            linear-gradient(rgba(8,8,8,${albumBg ? 0.4 : 0.7}) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(8,8,8,${albumBg ? 0.4 : 0.7}) 1px, transparent 1px)
-          `,
-          backgroundSize: "32px 32px",
-          backgroundPosition: "center center",
-          pointerEvents: "none",
-          transition: "opacity 0.8s ease-in-out",
+          zIndex: -1,
+          backgroundColor: "#080808",
         }}
       />
 
